@@ -1,8 +1,8 @@
 import * as liveModel from '../public/live-model.js';
 import test from 'node:test';import assert from 'node:assert/strict';import vm from 'node:vm';import fs from 'node:fs';import * as model from '../public/model.js';
 // A minimal element adapter exercises application state and generated markup without a browser.
-function harness(managed=false){
- const requests=[];const elements=new Map();
+function harness(managed=false,storedNews=null){
+ const requests=[],storageWrites=[];const elements=new Map();
  class El{constructor(id){this.id=id;this.dataset={};this.value=id==='rankTeam'?'HT':'';this.hidden=false;this.innerHTML='';this.textContent='';this.classList={add(){},remove(){},toggle(){},contains(){return false}};this.attributes={};this.listeners={}}addEventListener(k,f){this.listeners[k]=f}setAttribute(k,v){this.attributes[k]=v}removeAttribute(k){delete this.attributes[k]}querySelectorAll(){return []}getBoundingClientRect(){return{top:100,bottom:300,width:500}}scrollIntoView(){}focus(){}}
  const el=id=>{if(!elements.has(id))elements.set(id,new El(id));return elements.get(id)};
  const now=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
@@ -10,8 +10,8 @@ function harness(managed=false){
  const data={today:now,from:now,to:now,windowDays:7,games:[game],fetchedAt:new Date().toISOString(),stale:false};
  const ranks=JSON.parse(fs.readFileSync('worker/standings-snapshot.json'));
  const relay={gameId:game.gameId,inning:3,half:'초',state:{homeScore:2,awayScore:1,ball:2,strike:1,out:1,base1:'42',base2:0,base3:0},score:{home:{1:0,2:2},away:{1:0,2:1}},plays:[{id:1,inning:2,half:'말',title:'안타',lines:[{text:'적시타, 주자 득점'}]}],fetchedAt:new Date().toISOString()};
- const c={...model,...liveModel,Intl,Date,URL,URLSearchParams,Map,Set,Array,Number,JSON,Math,Promise,Object,String,AbortSignal,Response,setTimeout,clearTimeout,setInterval(){},scrollY:0,matchMedia:()=>({matches:false}),localStorage:{getItem(){return null},setItem(){}},navigator:{onLine:true},location:new URL('https://example.com/'),history:{replaceState(){}},HTMLImageElement:class{},requestAnimationFrame:f=>f(),fetch:async url=>(requests.push(url),Response.json(url.startsWith('/api/games')?data:url.startsWith('/api/standings')?ranks:url.startsWith('/api/news')?{articles:[{id:'https://www.yna.co.kr/view/test',url:'https://www.yna.co.kr/view/test',title:'KIA 최신 기사',publisher:'연합뉴스',category:'game',publishedAt:new Date().toISOString()}],fetchedAt:new Date().toISOString(),stale:false}:relay)),document:{getElementById:el,querySelectorAll(){return []},addEventListener(){},documentElement:{dataset:{theme:'light'}}},window:{kiaSeasonManaged:managed,addEventListener(){},scrollTo(){}},console};
- vm.createContext(c);let code=fs.readFileSync('public/app.js','utf8').replace(/^import .*;\n/gm,'');code+='\nglobalThis.inspect=()=>({lastData,relayData,gamesFailed,relayFailed,rankFailed,newsFailed,currentPage});globalThis.controls={chooseGame,setTab,renderLog,renderGames,refreshRelay,refreshGames,refreshAll,renderRelayEmpty,setView,renderSummary,refreshNews,refreshVideos,playVideo};globalThis.setData=(x)=>{lastData=x;renderGames()};globalThis.setRelay=(x)=>{relayData=x;renderSituation();renderSummary();renderLog()};';vm.runInContext(code,c);return {c,el,data,relay,game,requests};
+ const c={...model,...liveModel,Intl,Date,URL,URLSearchParams,Map,Set,Array,Number,JSON,Math,Promise,Object,String,AbortSignal,Response,setTimeout,clearTimeout,setInterval(){},scrollY:0,matchMedia:()=>({matches:false}),localStorage:{getItem(key){return key==='kia-saved-news'?storedNews:null},setItem(key,value){storageWrites.push([key,value])}},navigator:{onLine:true},location:new URL('https://example.com/'),history:{replaceState(){}},HTMLImageElement:class{},requestAnimationFrame:f=>f(),fetch:async url=>(requests.push(url),Response.json(url.startsWith('/api/games')?data:url.startsWith('/api/standings')?ranks:url.startsWith('/api/news')?{articles:[{id:'https://www.yna.co.kr/view/test',url:'https://www.yna.co.kr/view/test',title:'KIA 최신 기사',publisher:'연합뉴스',category:'game',publishedAt:new Date().toISOString()}],fetchedAt:new Date().toISOString(),stale:false}:relay)),document:{getElementById:el,querySelectorAll(){return []},addEventListener(){},documentElement:{dataset:{theme:'light'}}},window:{kiaSeasonManaged:managed,addEventListener(){},scrollTo(){}},console};
+ vm.createContext(c);let code=fs.readFileSync('public/app.js','utf8').replace(/^import .*;\n/gm,'');code+='\nglobalThis.inspect=()=>({lastData,relayData,gamesFailed,relayFailed,rankFailed,newsFailed,currentPage});globalThis.controls={chooseGame,setTab,renderLog,renderGames,refreshRelay,refreshGames,refreshAll,renderRelayEmpty,setView,renderSummary,refreshNews,refreshVideos,playVideo};globalThis.setData=(x)=>{lastData=x;renderGames()};globalThis.setRelay=(x)=>{relayData=x;renderSituation();renderSummary();renderLog()};';vm.runInContext(code,c);return {c,el,data,relay,game,requests,storageWrites};
 }
 test('application initializes all three data streams and generates meaningful visual markup',async()=>{const {c,el}=harness();await c.controls.refreshAll();const s=c.inspect();assert.equal(s.gamesFailed,false);assert.equal(s.rankFailed,false);assert.equal(s.relayFailed,false);assert.equal(s.newsFailed,false);assert.match(el('newsList').innerHTML,/KIA 최신 기사/);assert.match(el('today').innerHTML,/LIVE/);assert.match(el('situationContent').innerHTML,/field-svg/);assert.match(el('situationContent').innerHTML,/1루 주자/);assert.match(el('situationContent').innerHTML,/polyline/);assert.match(el('standingsTable').innerHTML,/pct-bar/);assert.match(el('relayLog').innerHTML,/적시타/)});
 test('stale game state removes LIVE badge and changes the primary scoreboard warning',async()=>{const {c,el,data}=harness();await c.controls.refreshAll();c.setData({...data,stale:true});assert.doesNotMatch(el('today').innerHTML,/LIVE/);assert.match(el('today').innerHTML,/갱신 지연/);assert.equal(el('notice').hidden,false)});
@@ -45,4 +45,19 @@ test('finished away win displays the winning team score first',async()=>{
  c.setData({...data,games:[awayWin]});
  assert.match(el('centerScore').innerHTML,/KIA 승리 · 13–1 경기 종료/);
  assert.doesNotMatch(el('centerScore').innerHTML,/KIA 승리 · 1–13/);
+});
+
+test('invalid saved-news entries do not break fresh or saved news and valid bookmarks survive',async()=>{
+ const article={id:'https://www.yna.co.kr/view/test',url:'https://www.yna.co.kr/view/test',title:'KIA 최신 기사',publisher:'연합뉴스',category:'game',publishedAt:new Date().toISOString()};
+ const stored=JSON.stringify([null,{},17,{...article,id:'unsafe',url:'javascript:alert(1)'},article]);
+ const {c,el,storageWrites}=harness(true,stored);
+ await c.controls.refreshNews();
+ assert.equal(c.inspect().newsFailed,false);
+ assert.match(el('newsList').innerHTML,/KIA 최신 기사/);
+ assert.match(el('newsList').innerHTML,/aria-pressed="true"/);
+ assert.match(el('homeNews').innerHTML,/KIA 최신 기사/);
+ vm.runInContext("newsFilter='saved';renderNews()",c);
+ assert.equal((el('newsList').innerHTML.match(/<article /g)||[]).length,1);
+ assert.doesNotMatch(el('newsList').innerHTML,/javascript:|unsafe/);
+ assert.equal(storageWrites.some(([key])=>key==='kia-saved-news'),false);
 });
