@@ -1,4 +1,141 @@
-import test from 'node:test';import assert from 'node:assert/strict';import vm from 'node:vm';import fs from 'node:fs';import * as model from '../public/model.js';
-function harness(){const elements=new Map();class El{constructor(id){this.id=id;this.dataset={};this.hidden=false;this.innerHTML='';this.textContent='';this.listeners={}}append(e){elements.set(e.id,e)}insertBefore(e){elements.set(e.id,e)}prepend(e){elements.set(e.id,e)}addEventListener(n,f){this.listeners[n]=f}querySelector(){return null}scrollIntoView(){}}const el=id=>{if(!elements.has(id))elements.set(id,new El(id));return elements.get(id)};const document={createElement:()=>new El(''),getElementById:el,documentElement:{dataset:{}},querySelectorAll:()=>[],addEventListener(){}};const d={active:true,today:'2026-10-14',year:'2026',fetchedAt:new Date().toISOString(),games:[{gameId:'44441014OBLG02026',psRound:'wc',gameDate:'2026-10-14',gameDateTime:'2026-10-14T18:30:00',homeTeamCode:'LG',awayTeamCode:'OB',homeTeamName:'LG',awayTeamName:'두산',statusCode:'STARTED',awayTeamScore:1,homeTeamScore:2}],rounds:[]};const c={...model,document,localStorage:{getItem:()=>null,setItem(){}},location:new URL('https://example.com'),history:{replaceState(){}},window:{addEventListener(){},scrollTo(){},dispatchEvent(){}},setInterval(){},AbortSignal,Date,URL,HashChangeEvent:class{},fetch:async url=>Response.json(url==='/api/postseason'?d:url.endsWith('news')?{articles:[{team:'kia',title:'KIA 가을야구',publisher:'뉴스',url:'https://example.com/kia',publishedAt:new Date().toISOString()},{team:'other',title:'LG 가을야구',publisher:'뉴스',url:'https://example.com/lg',publishedAt:new Date().toISOString()}]}:{videos:[]})};vm.createContext(c);vm.runInContext(fs.readFileSync('public/postseason.js','utf8').replace(/^import.*\n/,'')+'\nglobalThis.ready=()=>new Promise(r=>setTimeout(r,0));globalThis.testSet=(s)=>{if(s.page)page=s.page;if(s.mode)mode=s.mode;if(s.newsTeam)newsTeam=s.newsTeam;if(s.round)round=s.round;render()};',Object.assign(c,{setTimeout}));return {c,el,document}}
-test('postseason UI auto switches, shows non-KIA live games, divides news and offers four video rounds',async()=>{const {c,el,document}=harness();await c.ready();assert.equal(document.documentElement.dataset.season,'postseason');assert.match(el('postseasonRoot').innerHTML,/두산/);assert.match(el('postseasonRoot').innerHTML,/LIVE/);c.testSet({page:'news'});assert.match(el('postseasonRoot').innerHTML,/KIA 가을야구/);assert.doesNotMatch(el('postseasonRoot').innerHTML,/LG 가을야구/);c.testSet({newsTeam:'other'});assert.match(el('postseasonRoot').innerHTML,/LG 가을야구/);c.testSet({page:'videos'});for(const label of ['와일드카드','준플레이오프','플레이오프','한국시리즈'])assert.ok(el('postseasonRoot').innerHTML.includes(label));c.testSet({mode:'regular'});assert.equal(document.documentElement.dataset.season,'regular');assert.equal(el('postseasonRoot').hidden,true)});
-test('postseason settings route shows persistent settings panel and hides season content',async()=>{const {c,el,document}=harness();await c.ready();c.testSet({page:'settings'});assert.equal(el('settingsPage').hidden,false);assert.equal(el('postseasonRoot').hidden,true);assert.equal(document.documentElement.dataset.psPage,'settings');c.testSet({page:'games'});assert.equal(el('settingsPage').hidden,true);assert.equal(el('postseasonRoot').hidden,false)});
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import fs from 'node:fs';
+import * as model from '../public/model.js';
+function harness() {
+  const elements = new Map();
+  class El {
+    constructor(id) {
+      this.id = id;
+      this.dataset = {};
+      this.hidden = false;
+      this.innerHTML = '';
+      this.textContent = '';
+      this.listeners = {};
+    }
+    append(e) {
+      elements.set(e.id, e);
+    }
+    insertBefore(e) {
+      elements.set(e.id, e);
+    }
+    prepend(e) {
+      elements.set(e.id, e);
+    }
+    addEventListener(n, f) {
+      this.listeners[n] = f;
+    }
+    querySelector() {
+      return null;
+    }
+    scrollIntoView() {}
+  }
+  const el = (id) => {
+    if (!elements.has(id)) elements.set(id, new El(id));
+    return elements.get(id);
+  };
+  const document = {
+    createElement: () => new El(''),
+    getElementById: el,
+    documentElement: { dataset: {} },
+    querySelectorAll: () => [],
+    addEventListener() {}
+  };
+  const d = {
+    active: true,
+    today: '2026-10-14',
+    year: '2026',
+    fetchedAt: new Date().toISOString(),
+    games: [
+      {
+        gameId: '44441014OBLG02026',
+        psRound: 'wc',
+        gameDate: '2026-10-14',
+        gameDateTime: '2026-10-14T18:30:00',
+        homeTeamCode: 'LG',
+        awayTeamCode: 'OB',
+        homeTeamName: 'LG',
+        awayTeamName: '두산',
+        statusCode: 'STARTED',
+        awayTeamScore: 1,
+        homeTeamScore: 2
+      }
+    ],
+    rounds: []
+  };
+  const c = {
+    ...model,
+    document,
+    localStorage: { getItem: () => null, setItem() {} },
+    location: new URL('https://example.com'),
+    history: { replaceState() {} },
+    window: { addEventListener() {}, scrollTo() {}, dispatchEvent() {} },
+    setInterval() {},
+    AbortSignal,
+    Date,
+    URL,
+    HashChangeEvent: class {},
+    fetch: async (url) =>
+      Response.json(
+        url === '/api/postseason'
+          ? d
+          : url.endsWith('news')
+            ? {
+                articles: [
+                  {
+                    team: 'kia',
+                    title: 'KIA 가을야구',
+                    publisher: '뉴스',
+                    url: 'https://example.com/kia',
+                    publishedAt: new Date().toISOString()
+                  },
+                  {
+                    team: 'other',
+                    title: 'LG 가을야구',
+                    publisher: '뉴스',
+                    url: 'https://example.com/lg',
+                    publishedAt: new Date().toISOString()
+                  }
+                ]
+              }
+            : { videos: [] }
+      )
+  };
+  vm.createContext(c);
+  vm.runInContext(
+    fs.readFileSync('public/postseason.js', 'utf8').replace(/^import.*\n/, '') +
+      '\nglobalThis.ready=()=>new Promise(r=>setTimeout(r,0));globalThis.testSet=(s)=>{if(s.page)page=s.page;if(s.mode)mode=s.mode;if(s.newsTeam)newsTeam=s.newsTeam;if(s.round)round=s.round;render()};',
+    Object.assign(c, { setTimeout })
+  );
+  return { c, el, document };
+}
+test('postseason UI auto switches, shows non-KIA live games, divides news and offers four video rounds', async () => {
+  const { c, el, document } = harness();
+  await c.ready();
+  assert.equal(document.documentElement.dataset.season, 'postseason');
+  assert.match(el('postseasonRoot').innerHTML, /두산/);
+  assert.match(el('postseasonRoot').innerHTML, /LIVE/);
+  c.testSet({ page: 'news' });
+  assert.match(el('postseasonRoot').innerHTML, /KIA 가을야구/);
+  assert.doesNotMatch(el('postseasonRoot').innerHTML, /LG 가을야구/);
+  c.testSet({ newsTeam: 'other' });
+  assert.match(el('postseasonRoot').innerHTML, /LG 가을야구/);
+  c.testSet({ page: 'videos' });
+  for (const label of ['와일드카드', '준플레이오프', '플레이오프', '한국시리즈'])
+    assert.ok(el('postseasonRoot').innerHTML.includes(label));
+  c.testSet({ mode: 'regular' });
+  assert.equal(document.documentElement.dataset.season, 'regular');
+  assert.equal(el('postseasonRoot').hidden, true);
+});
+test('postseason settings route shows persistent settings panel and hides season content', async () => {
+  const { c, el, document } = harness();
+  await c.ready();
+  c.testSet({ page: 'settings' });
+  assert.equal(el('settingsPage').hidden, false);
+  assert.equal(el('postseasonRoot').hidden, true);
+  assert.equal(document.documentElement.dataset.psPage, 'settings');
+  c.testSet({ page: 'games' });
+  assert.equal(el('settingsPage').hidden, true);
+  assert.equal(el('postseasonRoot').hidden, false);
+});

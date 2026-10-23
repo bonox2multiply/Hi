@@ -1,14 +1,145 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {cumulative,tally,occupied,filterPlays,scores,outcome,isLive} from '../public/model.js';
-import {dateWindow,getGames} from '../worker/api.js';
-import {normalizeRelay} from '../worker/relay.js';
-const game={gameId:'20261012LGHT02026',gameDate:'2026-10-12',gameDateTime:'2026-10-12T18:30:00',homeTeamCode:'HT',homeTeamName:'KIA',awayTeamCode:'LG',awayTeamName:'LG',homeTeamScore:6,awayTeamScore:3,winner:'HOME',statusCode:'RESULT'};
-test('run graph distinguishes real zero from missing and never bridges missing innings',()=>{assert.deepEqual(cumulative({'1':0,'2':'2','3':0,'5':4},6),[0,2,2,null,null,null]);assert.deepEqual(cumulative({'1':'0','2':'X'},3),[0,null,null]);});
-test('run comparison keeps KIA first in away games and does not treat missing totals as zero',()=>{const away={...game,homeTeamCode:'LG',awayTeamCode:'HT'};assert.deepEqual(scores(away),[3,6]);assert.equal(outcome(away),'패');const s=tally([game,away,{...game,homeTeamScore:null},{...game,cancel:true}]);assert.equal(s.scored,2);assert.equal(s.runs,9);assert.equal(s.allowed,9);assert.equal(s.done.length,3);});
-test('cancelled and suspended games never show LIVE or affect recent form',()=>{assert.equal(isLive({...game,statusCode:'STARTED',cancel:true}),false);assert.equal(isLive({...game,statusCode:'STARTED',suspended:true}),false);assert.equal(tally([{...game,cancel:true},{...game,suspended:true}]).known.length,0);assert.equal(tally([{...game,winner:null}]).pct,null)});
-test('base occupancy distinguishes player ids from provider empty values',()=>{for(const v of [null,undefined,false,'',0,'0'])assert.equal(occupied(v),false);for(const v of ['12345',12345,true])assert.equal(occupied(v),true)});
-test('inning and highlight filters work together without dropping the source text',()=>{const p=[{inning:1,lines:[{text:'2번 타자 삼진'}]},{inning:2,lines:[{text:'우중간 적시타, 1루 주자 득점'}]},{inning:3,lines:[{text:'좌월 홈런'}]}];assert.equal(filterPlays(p,{highlights:true}).length,2);assert.deepEqual(filterPlays(p,{inning:'2',highlights:true}),[p[1]])});
-test('30-day schedule window crosses years using Korean calendar date',()=>{const w=dateWindow(new Date('2026-12-31T15:00:00Z'),30);assert.equal(w.today,'2027-01-01');assert.equal(w.from,'2026-12-02');assert.equal(w.to,'2027-01-31');assert.equal(w.windowDays,30);assert.equal(dateWindow(new Date(),1000).windowDays,7)});
-test('expanded schedule actually asks the provider for the 30-day range',async()=>{let url;const d=await getGames(new Date('2026-10-12T10:00:00Z'),async u=>{url=new URL(u);return Response.json({success:true,result:{games:[game],gameTotalCount:1}})},30);assert.equal(url.searchParams.get('fromDate'),'2026-09-12');assert.equal(url.searchParams.get('toDate'),'2026-11-11');assert.equal(d.games.length,1);assert.equal(d.windowDays,30)});
-test('relay parser associates pitcher and batter and preserves real innings, runs, pitches',()=>{const id=game.gameId;const d=normalizeRelay({success:true,result:{textRelayData:{gameId:id,inn:2,homeOrAway:'0',inningScore:{home:{1:0},away:{1:1,2:2}},currentGameState:{pitcher:'p1',batter:'b1',base1:'b2',ball:2,strike:1,out:1},homeLineup:{pitcher:[{pcode:'p1',name:'투수'}]},awayLineup:{batter:[{pcode:'b1',name:'타자'}]},textRelays:[{no:1,inn:1,homeOrAway:0,title:'첫 기록',textOptions:[{seqno:1,text:' 1루타 ',speed:145}]},{no:2,inn:2,homeOrAway:0,title:'다음 기록',textOptions:[{seqno:2,text:'득점'}]}]}}},id);assert.equal(d.pitcher,'투수');assert.equal(d.batter,'타자');assert.equal(d.half,'초');assert.equal(d.plays[0].id,2);assert.equal(d.plays[1].lines[0].text,'1루타');assert.deepEqual(d.score.away,{1:1,2:2});assert.throws(()=>normalizeRelay({success:false},id))});
+import {
+  cumulative,
+  tally,
+  occupied,
+  filterPlays,
+  scores,
+  outcome,
+  isLive
+} from '../public/model.js';
+import { dateWindow, getGames } from '../worker/api.js';
+import { normalizeRelay } from '../worker/relay.js';
+const game = {
+  gameId: '20261012LGHT02026',
+  gameDate: '2026-10-12',
+  gameDateTime: '2026-10-12T18:30:00',
+  homeTeamCode: 'HT',
+  homeTeamName: 'KIA',
+  awayTeamCode: 'LG',
+  awayTeamName: 'LG',
+  homeTeamScore: 6,
+  awayTeamScore: 3,
+  winner: 'HOME',
+  statusCode: 'RESULT'
+};
+test('run graph distinguishes real zero from missing and never bridges missing innings', () => {
+  assert.deepEqual(cumulative({ '1': 0, '2': '2', '3': 0, '5': 4 }, 6), [
+    0,
+    2,
+    2,
+    null,
+    null,
+    null
+  ]);
+  assert.deepEqual(cumulative({ '1': '0', '2': 'X' }, 3), [0, null, null]);
+});
+test('run comparison keeps KIA first in away games and does not treat missing totals as zero', () => {
+  const away = { ...game, homeTeamCode: 'LG', awayTeamCode: 'HT' };
+  assert.deepEqual(scores(away), [3, 6]);
+  assert.equal(outcome(away), '패');
+  const s = tally([game, away, { ...game, homeTeamScore: null }, { ...game, cancel: true }]);
+  assert.equal(s.scored, 2);
+  assert.equal(s.runs, 9);
+  assert.equal(s.allowed, 9);
+  assert.equal(s.done.length, 3);
+});
+test('cancelled and suspended games never show LIVE or affect recent form', () => {
+  assert.equal(isLive({ ...game, statusCode: 'STARTED', cancel: true }), false);
+  assert.equal(isLive({ ...game, statusCode: 'STARTED', suspended: true }), false);
+  assert.equal(
+    tally([
+      { ...game, cancel: true },
+      { ...game, suspended: true }
+    ]).known.length,
+    0
+  );
+  assert.equal(tally([{ ...game, winner: null }]).pct, null);
+});
+test('base occupancy distinguishes player ids from provider empty values', () => {
+  for (const v of [null, undefined, false, '', 0, '0']) assert.equal(occupied(v), false);
+  for (const v of ['12345', 12345, true]) assert.equal(occupied(v), true);
+});
+test('inning and highlight filters work together without dropping the source text', () => {
+  const p = [
+    { inning: 1, lines: [{ text: '2번 타자 삼진' }] },
+    { inning: 2, lines: [{ text: '우중간 적시타, 1루 주자 득점' }] },
+    { inning: 3, lines: [{ text: '좌월 홈런' }] }
+  ];
+  assert.equal(filterPlays(p, { highlights: true }).length, 2);
+  assert.deepEqual(filterPlays(p, { inning: '2', highlights: true }), [p[1]]);
+});
+test('30-day schedule window crosses years using Korean calendar date', () => {
+  const w = dateWindow(new Date('2026-12-31T15:00:00Z'), 30);
+  assert.equal(w.today, '2027-01-01');
+  assert.equal(w.from, '2026-12-02');
+  assert.equal(w.to, '2027-01-31');
+  assert.equal(w.windowDays, 30);
+  assert.equal(dateWindow(new Date(), 1000).windowDays, 7);
+});
+test('expanded schedule actually asks the provider for the 30-day range', async () => {
+  let url;
+  const d = await getGames(
+    new Date('2026-10-12T10:00:00Z'),
+    async (u) => {
+      url = new URL(u);
+      return Response.json({ success: true, result: { games: [game], gameTotalCount: 1 } });
+    },
+    30
+  );
+  assert.equal(url.searchParams.get('fromDate'), '2026-09-12');
+  assert.equal(url.searchParams.get('toDate'), '2026-11-11');
+  assert.equal(d.games.length, 1);
+  assert.equal(d.windowDays, 30);
+});
+test('relay parser associates pitcher and batter and preserves real innings, runs, pitches', () => {
+  const id = game.gameId;
+  const d = normalizeRelay(
+    {
+      success: true,
+      result: {
+        textRelayData: {
+          gameId: id,
+          inn: 2,
+          homeOrAway: '0',
+          inningScore: { home: { 1: 0 }, away: { 1: 1, 2: 2 } },
+          currentGameState: {
+            pitcher: 'p1',
+            batter: 'b1',
+            base1: 'b2',
+            ball: 2,
+            strike: 1,
+            out: 1
+          },
+          homeLineup: { pitcher: [{ pcode: 'p1', name: '투수' }] },
+          awayLineup: { batter: [{ pcode: 'b1', name: '타자' }] },
+          textRelays: [
+            {
+              no: 1,
+              inn: 1,
+              homeOrAway: 0,
+              title: '첫 기록',
+              textOptions: [{ seqno: 1, text: ' 1루타 ', speed: 145 }]
+            },
+            {
+              no: 2,
+              inn: 2,
+              homeOrAway: 0,
+              title: '다음 기록',
+              textOptions: [{ seqno: 2, text: '득점' }]
+            }
+          ]
+        }
+      }
+    },
+    id
+  );
+  assert.equal(d.pitcher, '투수');
+  assert.equal(d.batter, '타자');
+  assert.equal(d.half, '초');
+  assert.equal(d.plays[0].id, 2);
+  assert.equal(d.plays[1].lines[0].text, '1루타');
+  assert.deepEqual(d.score.away, { 1: 1, 2: 2 });
+  assert.throws(() => normalizeRelay({ success: false }, id));
+});
