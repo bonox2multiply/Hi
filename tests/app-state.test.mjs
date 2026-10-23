@@ -501,3 +501,21 @@ test('invalid saved-news entries do not break fresh or saved news and valid book
     false,
   );
 });
+
+test('saved-news search distinguishes no matches from no bookmarks', () => {
+  const article = {
+    id: 'https://www.yna.co.kr/view/search-test',
+    url: 'https://www.yna.co.kr/view/search-test',
+    title: 'KIA 검색 테스트', publisher: '연합뉴스', category: 'game',
+    publishedAt: new Date().toISOString(),
+  };
+  const { c, el, storageWrites } = harness(true, JSON.stringify([article]));
+  vm.runInContext("newsFilter='saved';newsQuery='일치하지않음';renderNews()", c);
+  assert.match(el('newsList').innerHTML, /검색어와 일치하는 기사가 없어요/);
+  assert.doesNotMatch(el('newsList').innerHTML, /저장한 기사가 없어요/);
+  vm.runInContext("newsQuery='';renderNews()", c);
+  assert.match(el('newsList').innerHTML, /KIA 검색 테스트/);
+  vm.runInContext("savedNews=[];renderNews()", c);
+  assert.match(el('newsList').innerHTML, /저장한 기사가 없어요/);
+  assert.equal(storageWrites.some(([key]) => key === 'kia-saved-news'), false);
+});
