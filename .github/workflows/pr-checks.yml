@@ -1,19 +1,18 @@
-name: Bug fix build and tests
+name: PR build and tests
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, labeled, unlabeled]
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: read
 
 concurrency:
-  group: bugfix-checks-${{ github.event.pull_request.number }}
+  group: pr-checks-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
   build-and-test:
-    if: contains(github.event.pull_request.labels.*.name, 'bug')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
