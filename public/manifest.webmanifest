@@ -1,0 +1,1 @@
+{"name": "KIA 다이아몬드", "short_name": "KIA 다이아몬드", "lang": "ko", "id": "/", "start_url": "/", "scope": "/", "display": "standalone", "background_color": "#101114", "theme_color": "#c8102e", "description": "KIA 경기, 자동 요약, 최근 7일 유튜브 하이라이트와 최신 뉴스", "icons": [{"src": "/icon.svg?v=7", "sizes": "any", "type": "image/svg+xml", "purpose": "any"}]}
