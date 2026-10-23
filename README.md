@@ -3,7 +3,7 @@
 기아 타이거즈 경기 일정, 결과, 중계와 관련 소식을 보여주는 사이트입니다.
 
 - 운영 사이트: https://kiadiamond.nicebs.chatgpt.site
-- 소스 관리: https://github.com/bonox2multiply/67
+- 소스 관리: https://github.com/bonox2multiply/Hi
 - 이전 원본: Sites 소스 커밋 `abe93467ccd209d25c19ff18f14ef40163105a0c`
 
 ## 로컬 검증
