@@ -1,15 +1,158 @@
-import test from 'node:test';import assert from 'node:assert/strict';
-import {summarizeGame} from '../public/model.js';import {parseNewsFeed,fetchNews,newsText} from '../worker/news.js';
-const g={gameId:'20261012LGHT02026',gameDate:'2026-10-12',statusCode:'RESULT',homeTeamCode:'HT',awayTeamCode:'LG',homeTeamName:'KIA',awayTeamName:'LG',homeTeamScore:5,awayTeamScore:2,winner:'HOME',stadium:'광주',winPitcherName:'투수 A',losePitcherName:'투수 B'};
-const d={gameId:g.gameId,state:{homeScore:5,awayScore:2,homeHit:8,awayHit:6},score:{home:{1:0,2:2,3:3},away:{1:1,2:1,3:0}},plays:[{id:2,inning:3,half:'말',lines:[{text:'주자 득점'}]},{id:1,inning:2,half:'말',lines:[{text:'적시타'}]}]};
-test('recap synthesizes final score, scoring inning, pitchers and hits from confirmed records',()=>{const r=summarizeGame(g,d);assert.equal(r.result,'승리');assert.equal(r.margin,3);assert.match(r.title,/5–2 승리/);assert.match(r.lead,/2026\.10\.12 광주/);assert.match(r.bullets.join(' '),/3회말로, 3점/);assert.match(r.bullets.join(' '),/투수 A/);assert.match(r.bullets.join(' '),/8개/);assert.deepEqual(r.events.map(x=>x.id),[1,2]);assert.equal(r.limited,false)});
-test('no final recap is generated for live, cancelled, suspended or missing-score games',()=>{for(const patch of [{statusCode:'STARTED'},{statusCode:'BEFORE'},{cancel:true},{suspended:true},{homeTeamScore:null}])assert.equal(summarizeGame({...g,...patch},d).available,false)});
-test('recap handles KIA away, draws and shutouts without invented heroes',()=>{const away={...g,homeTeamCode:'LG',awayTeamCode:'HT',homeTeamName:'LG',awayTeamName:'KIA',winPitcherName:null,losePitcherName:null};const r=summarizeGame(away);assert.equal(r.result,'패배');assert.match(r.title,/2–5 패배/);assert.equal(r.bullets.length,0);assert.equal(summarizeGame({...g,homeTeamScore:2}).result,'무승부');assert.match(summarizeGame({...g,awayTeamScore:0}).bullets.join(' '),/무득점/)});
-test('outdated relay totals and partial innings never become claims about the decisive inning',()=>{const stale=summarizeGame(g,{...d,state:{...d.state,homeScore:2}});assert.equal(stale.kia,5);assert.equal(stale.burst,null);assert.equal(stale.events.length,0);const partial=summarizeGame(g,{...d,score:{home:{1:0,2:2},away:{1:0}}});assert.equal(partial.limited,true);assert.match(partial.bullets[0],/제공된 이닝 기록/);assert.doesNotMatch(partial.bullets[0],/최다|결승|역전/)});
-const now=new Date('2026-10-12T14:00:00Z'),source={name:'연합뉴스',hosts:['yna.co.kr']};
-function item(title,url,date='Mon, 12 Oct 2026 13:00:00 GMT'){return `<item><title><![CDATA[${title}]]></title><link>${url}</link><pubDate>${date}</pubDate></item>`}
-test('news parser filters unrelated, old and future items, rejects unsafe links and deduplicates',()=>{const a=item('KIA, LG 꺾고 승리','https://www.yna.co.kr/view/1');const xml='<rss><channel>'+a+a+item('삼성 축구 경기','https://www.yna.co.kr/view/2')+item('KIA 과거 기사','https://www.yna.co.kr/view/3','Mon, 01 Jun 2026 13:00:00 GMT')+item('KIA 미래 기사','https://www.yna.co.kr/view/4','Mon, 19 Oct 2026 13:00:00 GMT')+item('KIA 악성 링크','javascript:alert(1)')+item('KIA 사칭 링크','https://yna.co.kr.example.com/a')+item('KIA 복귀 소식','https://www.yna.co.kr/view/5','Mon, 12 Oct 2026 13:10:00 GMT')+'</channel></rss>';const list=parseNewsFeed(xml,source,now);assert.equal(list.length,2);assert.equal(list[0].category,'team');assert.equal(list[1].category,'game');assert.equal(list[0].publishedAt,'2026-10-12T13:10:00.000Z')});
-test('news XML entities are safely decoded as text and malformed pages do not appear as empty news',()=>{assert.equal(newsText('KIA &amp; LG &#xD0C0;'), 'KIA & LG 타');assert.throws(()=>parseNewsFeed('<html>server error</html>',source,now));const r=parseNewsFeed('<rss><channel>'+item('KIA &lt;script&gt; text','https://www.yna.co.kr/view/a')+'</channel></rss>',source,now);assert.equal(r[0].title,'KIA <script> text')});
-test('news succeeds partially when a publisher fails and rejects when all providers fail',async()=>{const d=await fetchNews(async url=>{if(!url.includes('yna.co.kr'))throw Error('offline');return new Response('<rss><channel>'+item('KIA 최신 뉴스','https://www.yna.co.kr/view/1')+'</channel></rss>',{headers:{'content-type':'application/xml; charset=utf-8'}})},now);assert.equal(d.partial,true);assert.equal(d.articles.length,1);assert.deepEqual(d.sources,['연합뉴스']);await assert.rejects(()=>fetchNews(async()=>{throw Error('offline')},now))});
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { summarizeGame } from '../public/model.js';
+import { parseNewsFeed, fetchNews, newsText } from '../worker/news.js';
+const g = {
+  gameId: '20261012LGHT02026',
+  gameDate: '2026-10-12',
+  statusCode: 'RESULT',
+  homeTeamCode: 'HT',
+  awayTeamCode: 'LG',
+  homeTeamName: 'KIA',
+  awayTeamName: 'LG',
+  homeTeamScore: 5,
+  awayTeamScore: 2,
+  winner: 'HOME',
+  stadium: '광주',
+  winPitcherName: '투수 A',
+  losePitcherName: '투수 B'
+};
+const d = {
+  gameId: g.gameId,
+  state: { homeScore: 5, awayScore: 2, homeHit: 8, awayHit: 6 },
+  score: { home: { 1: 0, 2: 2, 3: 3 }, away: { 1: 1, 2: 1, 3: 0 } },
+  plays: [
+    { id: 2, inning: 3, half: '말', lines: [{ text: '주자 득점' }] },
+    { id: 1, inning: 2, half: '말', lines: [{ text: '적시타' }] }
+  ]
+};
+test('recap synthesizes final score, scoring inning, pitchers and hits from confirmed records', () => {
+  const r = summarizeGame(g, d);
+  assert.equal(r.result, '승리');
+  assert.equal(r.margin, 3);
+  assert.match(r.title, /5–2 승리/);
+  assert.match(r.lead, /2026\.10\.12 광주/);
+  assert.match(r.bullets.join(' '), /3회말로, 3점/);
+  assert.match(r.bullets.join(' '), /투수 A/);
+  assert.match(r.bullets.join(' '), /8개/);
+  assert.deepEqual(
+    r.events.map((x) => x.id),
+    [1, 2]
+  );
+  assert.equal(r.limited, false);
+});
+test('no final recap is generated for live, cancelled, suspended or missing-score games', () => {
+  for (const patch of [
+    { statusCode: 'STARTED' },
+    { statusCode: 'BEFORE' },
+    { cancel: true },
+    { suspended: true },
+    { homeTeamScore: null }
+  ])
+    assert.equal(summarizeGame({ ...g, ...patch }, d).available, false);
+});
+test('recap handles KIA away, draws and shutouts without invented heroes', () => {
+  const away = {
+    ...g,
+    homeTeamCode: 'LG',
+    awayTeamCode: 'HT',
+    homeTeamName: 'LG',
+    awayTeamName: 'KIA',
+    winPitcherName: null,
+    losePitcherName: null
+  };
+  const r = summarizeGame(away);
+  assert.equal(r.result, '패배');
+  assert.match(r.title, /2–5 패배/);
+  assert.equal(r.bullets.length, 0);
+  assert.equal(summarizeGame({ ...g, homeTeamScore: 2 }).result, '무승부');
+  assert.match(summarizeGame({ ...g, awayTeamScore: 0 }).bullets.join(' '), /무득점/);
+});
+test('outdated relay totals and partial innings never become claims about the decisive inning', () => {
+  const stale = summarizeGame(g, { ...d, state: { ...d.state, homeScore: 2 } });
+  assert.equal(stale.kia, 5);
+  assert.equal(stale.burst, null);
+  assert.equal(stale.events.length, 0);
+  const partial = summarizeGame(g, { ...d, score: { home: { 1: 0, 2: 2 }, away: { 1: 0 } } });
+  assert.equal(partial.limited, true);
+  assert.match(partial.bullets[0], /제공된 이닝 기록/);
+  assert.doesNotMatch(partial.bullets[0], /최다|결승|역전/);
+});
+const now = new Date('2026-10-12T14:00:00Z'),
+  source = { name: '연합뉴스', hosts: ['yna.co.kr'] };
+function item(title, url, date = 'Mon, 12 Oct 2026 13:00:00 GMT') {
+  return `<item><title><![CDATA[${title}]]></title><link>${url}</link><pubDate>${date}</pubDate></item>`;
+}
+test('news parser filters unrelated, old and future items, rejects unsafe links and deduplicates', () => {
+  const a = item('KIA, LG 꺾고 승리', 'https://www.yna.co.kr/view/1');
+  const xml =
+    '<rss><channel>' +
+    a +
+    a +
+    item('삼성 축구 경기', 'https://www.yna.co.kr/view/2') +
+    item('KIA 과거 기사', 'https://www.yna.co.kr/view/3', 'Mon, 01 Jun 2026 13:00:00 GMT') +
+    item('KIA 미래 기사', 'https://www.yna.co.kr/view/4', 'Mon, 19 Oct 2026 13:00:00 GMT') +
+    item('KIA 악성 링크', 'javascript:alert(1)') +
+    item('KIA 사칭 링크', 'https://yna.co.kr.example.com/a') +
+    item('KIA 복귀 소식', 'https://www.yna.co.kr/view/5', 'Mon, 12 Oct 2026 13:10:00 GMT') +
+    '</channel></rss>';
+  const list = parseNewsFeed(xml, source, now);
+  assert.equal(list.length, 2);
+  assert.equal(list[0].category, 'team');
+  assert.equal(list[1].category, 'game');
+  assert.equal(list[0].publishedAt, '2026-10-12T13:10:00.000Z');
+});
+test('news XML entities are safely decoded as text and malformed pages do not appear as empty news', () => {
+  assert.equal(newsText('KIA &amp; LG &#xD0C0;'), 'KIA & LG 타');
+  assert.throws(() => parseNewsFeed('<html>server error</html>', source, now));
+  const r = parseNewsFeed(
+    '<rss><channel>' +
+      item('KIA &lt;script&gt; text', 'https://www.yna.co.kr/view/a') +
+      '</channel></rss>',
+    source,
+    now
+  );
+  assert.equal(r[0].title, 'KIA <script> text');
+});
+test('news succeeds partially when a publisher fails and rejects when all providers fail', async () => {
+  const d = await fetchNews(async (url) => {
+    if (!url.includes('yna.co.kr')) throw Error('offline');
+    return new Response(
+      '<rss><channel>' + item('KIA 최신 뉴스', 'https://www.yna.co.kr/view/1') + '</channel></rss>',
+      { headers: { 'content-type': 'application/xml; charset=utf-8' } }
+    );
+  }, now);
+  assert.equal(d.partial, true);
+  assert.equal(d.articles.length, 1);
+  assert.deepEqual(d.sources, ['연합뉴스']);
+  await assert.rejects(() =>
+    fetchNews(async () => {
+      throw Error('offline');
+    }, now)
+  );
+});
 
-test('provider highlights and actual batting stats enrich recap even if latest relay contains only the ninth inning',()=>{const x=summarizeGame(g,{...d,plays:[],highlights:[{id:45,inning:3,half:'말',title:'타자 A',lines:[{text:'타자 A : 우익수 뒤 홈런'}]}],batters:{home:[{name:'타자 A',ab:4,hit:2,hr:1,rbi:3},{name:'타자 B',ab:4,hit:1,hr:0,rbi:0}]}});assert.equal(x.events.length,1);assert.equal(x.batters[0].name,'타자 A');assert.match(x.bullets.join(' '),/4타수 2안타, 1홈런, 3타점/)});
+test('provider highlights and actual batting stats enrich recap even if latest relay contains only the ninth inning', () => {
+  const x = summarizeGame(g, {
+    ...d,
+    plays: [],
+    highlights: [
+      {
+        id: 45,
+        inning: 3,
+        half: '말',
+        title: '타자 A',
+        lines: [{ text: '타자 A : 우익수 뒤 홈런' }]
+      }
+    ],
+    batters: {
+      home: [
+        { name: '타자 A', ab: 4, hit: 2, hr: 1, rbi: 3 },
+        { name: '타자 B', ab: 4, hit: 1, hr: 0, rbi: 0 }
+      ]
+    }
+  });
+  assert.equal(x.events.length, 1);
+  assert.equal(x.batters[0].name, '타자 A');
+  assert.match(x.bullets.join(' '), /4타수 2안타, 1홈런, 3타점/);
+});
