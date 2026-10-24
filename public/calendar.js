@@ -1,5 +1,5 @@
 import {esc} from '/model.js';
-import {createGameCalendarFile} from '/calendar-export.js?v=23';
+import {createGameCalendarFile,createGamesCalendarFile} from '/calendar-export.js?v=24';
 const $=id=>document.getElementById(id);
 const colors={HT:'#e23851',LG:'#c15b9b',OB:'#527bd5',SS:'#3289f5',KT:'#71798b',SK:'#df542e',HH:'#f49c32',NC:'#36aaaf',LT:'#50a9de',WO:'#a679d7'};
 let data=null,row=null,month='',selected='',view='month';
@@ -17,22 +17,29 @@ function exportMarkup(game,index){
  const noteId='calendarExportNote-'+index;
  return `<div class="calendar-export"><button class="text-button" data-calendar-export="${esc(game.gameId)}" aria-describedby="${noteId}" ${result.ok?'':'disabled'}>일정 파일 다운로드 (.ics)</button><p id="${noteId}" class="small muted">${result.ok?'개인 캘린더에 추가할 수 있어요. 다운로드 후 변경은 자동 반영되지 않습니다.':esc(result.message)}</p><p data-export-status role="status" class="small muted"></p></div>`;
 }
-function downloadCalendar(button){
+function bulkExportMarkup(){
+ const result=createGamesCalendarFile(data.games,{...data,online:navigator.onLine});
+ const range=data.from&&data.to?`${esc(data.from)}–${esc(data.to)}`:'조회 기간 확인 중';
+ $('calendarBulkExport').innerHTML=`<button class="text-button" data-calendar-export-all aria-describedby="calendarBulkNote" ${result.ok?'':'disabled'}>예정 일정 한 번에 다운로드 (.ics)</button><p id="calendarBulkNote" class="small muted">${range} 조회 범위 전체 · ${result.ok?`${result.count}경기 포함 · ${result.excluded}개 제외`:esc(result.message)}<br>날짜·홈/원정 필터와 관계없이 포함합니다. 취소·종료·시간 미정 등은 제외하며 다운로드 후 변경은 자동 반영되지 않습니다.</p><p data-export-status role="status" class="small muted"></p>`;
+}
+function downloadCalendar(button,all=false){
  const status=button.parentElement.querySelector('[data-export-status]');
+ const freshness={...data,online:navigator.onLine};
  const game=data?.games.find(g=>g.gameId===button.dataset.calendarExport);
- const result=createGameCalendarFile(game,{...data,online:navigator.onLine});
+ const result=all?createGamesCalendarFile(data?.games,freshness):createGameCalendarFile(game,freshness);
  if(!result.ok){status.textContent=result.message;return;}
  let url;
  try{
   url=URL.createObjectURL(new Blob([result.content],{type:'text/calendar;charset=utf-8'}));
   const link=document.createElement('a');link.href=url;link.download=result.filename;
   document.body.append(link);link.click();link.remove();
-  status.textContent='다운로드를 요청했어요. 받은 파일을 캘린더 앱에서 열어 주세요.';
+  status.textContent=(all?`${result.count}경기가 담긴 파일의 다운로드를 요청했어요. ${result.excluded}개는 제외했어요. `:'다운로드를 요청했어요. ')+'받은 파일을 캘린더 앱에서 열어 주세요.';
  }catch{status.textContent='파일을 받지 못했어요. 브라우저 다운로드 설정을 확인하고 다시 시도해 주세요.';}
  finally{if(url)setTimeout(()=>URL.revokeObjectURL(url),30000);}
 }
 function draw(){
  if(!data)return;
+ bulkExportMarkup();
  $('weekStrip').hidden=view!=='week';$('monthCalendar').hidden=view!=='month';
  const first=(data.from||data.today).slice(0,7),last=(data.to||data.today).slice(0,7);
  if(!month||month<first||month>last)month=data.today.slice(0,7);
@@ -44,6 +51,7 @@ function draw(){
  }).join('')}</div><div id="calendarDetail" class="calendar-detail" aria-live="polite" hidden></div><p class="calendar-note">두 점은 원정·홈 구단 순서 · ${(data.from||data.today).slice(5)}–${(data.to||data.today).slice(5)} 조회${data.stale?' · 갱신 지연':''}</p>`;detail();
 }
 document.addEventListener('click',e=>{
+ const bulk=e.target.closest('[data-calendar-export-all]');if(bulk){downloadCalendar(bulk,true);return;}
  const download=e.target.closest('[data-calendar-export]');if(download){downloadCalendar(download);return;}
  const tab=e.target.closest('[data-calendar-view]'),step=e.target.closest('[data-calendar-step]'),day=e.target.closest('[data-calendar-date]'),close=e.target.closest('[data-calendar-close]');
  if(tab){view=tab.dataset.calendarView;document.querySelectorAll('[data-calendar-view]').forEach(b=>b.setAttribute('aria-pressed',String(b===tab)));draw()}

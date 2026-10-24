@@ -60,7 +60,7 @@ test('download includes the actual start time and leaves date controls usable',a
   const content=await fs.readFile(await download.path(),'utf8');
   expect(content).toContain(`DTSTART:${scenario.date.replaceAll('-','')}T093000Z`);
   expect(content).not.toContain('DTEND');
-  await expect(page.locator('[data-export-status]')).toContainText('다운로드를 요청');
+  await expect(page.locator('#calendarDetail [data-export-status]')).toContainText('다운로드를 요청');
   await page.locator('[data-calendar-close]').click();
   await expect(page.locator('#calendarDetail')).toBeHidden();
 });
@@ -70,7 +70,7 @@ for(const condition of ['stale','canceled','unknown-time'])test(`download blocks
   if(condition==='unknown-time')scenario.game.timeTbd=true;
   await openDate(page,scenario);
   await expect(page.locator('[data-calendar-export]')).toBeDisabled();
-  await expect(page.locator('.calendar-export p').first()).toContainText(condition==='stale'?'새로고침':condition==='canceled'?'취소':'시작 시각');
+  await expect(page.locator('#calendarDetail .calendar-export p').first()).toContainText(condition==='stale'?'새로고침':condition==='canceled'?'취소':'시작 시각');
 });
 
 test('offline at download time is reported without producing a file',async({page,scenario})=>{
@@ -78,7 +78,7 @@ test('offline at download time is reported without producing a file',async({page
   await page.evaluate(()=>Object.defineProperty(navigator,'onLine',{get:()=>false,configurable:true}));
   let downloads=0;page.on('download',()=>downloads++);
   await page.locator('[data-calendar-export]').click();
-  await expect(page.locator('[data-export-status]')).toContainText('오프라인');
+  await expect(page.locator('#calendarDetail [data-export-status]')).toContainText('오프라인');
   expect(downloads).toBe(0);
 });
 
@@ -87,17 +87,69 @@ test('download rechecks freshness after the detail was opened',async({page,scena
   await expect(page.locator('[data-calendar-export]')).toBeEnabled();
   await page.evaluate(()=>{const now=Date.now();Date.now=()=>now+6*60000;});
   await page.locator('[data-calendar-export]').click();
-  await expect(page.locator('[data-export-status]')).toContainText('새로고침');
+  await expect(page.locator('#calendarDetail [data-export-status]')).toContainText('새로고침');
 });
 
 test('file creation failure is explained and the button permits a retry',async({page,scenario})=>{
   await openDate(page,scenario);
   await page.evaluate(()=>{window.originalCreateURL=URL.createObjectURL;URL.createObjectURL=()=>{throw Error('controlled download failure');};});
   await page.locator('[data-calendar-export]').click();
-  await expect(page.locator('[data-export-status]')).toContainText('파일을 받지 못했어요');
+  await expect(page.locator('#calendarDetail [data-export-status]')).toContainText('파일을 받지 못했어요');
   await page.evaluate(()=>{URL.createObjectURL=window.originalCreateURL;});
   const pending=page.waitForEvent('download');
   await page.locator('[data-calendar-export]').click();
   await pending;
-  await expect(page.locator('[data-export-status]')).toContainText('다운로드를 요청');
+  await expect(page.locator('#calendarDetail [data-export-status]')).toContainText('다운로드를 요청');
+});
+
+
+test('bulk download contains eligible games and reports excluded entries',async({page,scenario},testInfo)=>{
+  scenario.games=[scenario.game,{...scenario.game,gameId:scenario.game.gameId.replace('02026','12026')},
+    {...scenario.game,gameId:scenario.game.gameId.replace('02026','22026'),cancel:true},
+    {...scenario.game,gameId:scenario.game.gameId.replace('02026','32026'),timeTbd:true}];
+  await page.goto('/#games');
+  const button=page.locator('[data-calendar-export-all]');
+  await expect(button).toBeEnabled();
+  await expect(page.locator('#calendarBulkNote')).toContainText('2경기 포함 · 2개 제외');
+  await page.locator('[data-calendar-view="week"]').click();
+  await expect(button).toBeVisible();
+  const pending=page.waitForEvent('download');
+  await button.focus();await page.keyboard.press('Enter');
+  const download=await pending;
+  const content=await fs.readFile(await download.path(),'utf8');
+  expect(download.suggestedFilename()).toMatch(/^kia-schedule-/);
+  expect((content.match(/BEGIN:VEVENT/g)||[]).length).toBe(2);
+  expect((content.match(/BEGIN:VCALENDAR/g)||[]).length).toBe(1);
+  await expect(page.locator('#calendarBulkExport [data-export-status]')).toContainText('2경기가 담긴 파일');
+  await page.locator('#calendarBulkExport').screenshot({path:testInfo.outputPath('bulk-calendar.png')});
+});
+
+test('bulk download follows the selected 7 or 30 day range',async({page,scenario})=>{
+  const later=new Date(Date.parse(scenario.today+'T00:00:00Z')+15*86400000).toISOString().slice(0,10);
+  scenario.games=[scenario.game,{...scenario.game,gameId:later.replaceAll('-','')+'LGHT02026',gameDate:later,gameDateTime:later+'T18:30:00'}];
+  await page.goto('/#games');
+  await expect(page.locator('#calendarBulkNote')).toContainText('2경기 포함');
+  await page.locator('[data-window="7"]').click();
+  await expect(page.locator('#calendarBulkNote')).toContainText('1경기 포함');
+  await page.locator('[data-window="30"]').click();
+  await expect(page.locator('#calendarBulkNote')).toContainText('2경기 포함');
+});
+
+test('bulk download explains why an empty schedule cannot be downloaded',async({page,scenario})=>{
+  scenario.games=[];
+  await page.goto('/#games');
+  await expect(page.locator('[data-calendar-export-all]')).toBeDisabled();
+  await expect(page.locator('#calendarBulkNote')).toContainText('다운로드할 예정 경기가 없어요');
+});
+
+test('bulk download blocks stale data and rechecks offline state at click time',async({page,scenario})=>{
+  scenario.stale=true;
+  await page.goto('/#games');
+  await expect(page.locator('[data-calendar-export-all]')).toBeDisabled();
+  await expect(page.locator('#calendarBulkNote')).toContainText('새로고침');
+  scenario.stale=false;await page.reload();
+  await expect(page.locator('[data-calendar-export-all]')).toBeEnabled();
+  await page.evaluate(()=>Object.defineProperty(navigator,'onLine',{get:()=>false,configurable:true}));
+  await page.locator('[data-calendar-export-all]').click();
+  await expect(page.locator('#calendarBulkExport [data-export-status]')).toContainText('오프라인');
 });

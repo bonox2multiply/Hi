@@ -15,7 +15,8 @@ export const test=base.extend({
       const u=new URL(route.request().url());
       if(u.origin!=='http://127.0.0.1:4177'){await route.abort();return;}
       if(!u.pathname.startsWith('/api/')){await route.continue();return;}
-      const data={today,from:shift(-30),to:shift(30),windowDays:30,games:[state.game],active:false,stale:state.stale,fetchedAt:new Date().toISOString()};
+      const days=u.pathname==='/api/games'&&u.searchParams.get('days')==='7'?7:30;
+      const data={today,from:shift(-days),to:shift(days),windowDays:days,games:state.games||[state.game],active:false,stale:state.stale,fetchedAt:new Date().toISOString()};
       let body=data;
       if(u.pathname==='/api/news'){
         if(state.delayNews)await new Promise(r=>setTimeout(r,state.delayNews));
