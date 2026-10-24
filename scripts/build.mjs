@@ -3,6 +3,7 @@ fs.mkdirSync('dist/server', { recursive: true });
 fs.mkdirSync('dist/.openai', { recursive: true });
 const assetTypes = {
   'live-model.js': 'text/javascript;charset=utf-8',
+  'calendar-export.js': 'text/javascript;charset=utf-8',
   'calendar.js': 'text/javascript;charset=utf-8',
   'settings.js': 'text/javascript;charset=utf-8',
   'index.html': 'text/html;charset=utf-8',

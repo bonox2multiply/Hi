@@ -1,4 +1,5 @@
 import {esc} from '/model.js';
+import {createGameCalendarFile} from '/calendar-export.js?v=23';
 const $=id=>document.getElementById(id);
 const colors={HT:'#e23851',LG:'#c15b9b',OB:'#527bd5',SS:'#3289f5',KT:'#71798b',SK:'#df542e',HH:'#f49c32',NC:'#36aaaf',LT:'#50a9de',WO:'#a679d7'};
 let data=null,row=null,month='',selected='',view='month';
@@ -9,7 +10,26 @@ function detail(){
  document.querySelectorAll('[data-calendar-date]').forEach(b=>b.setAttribute('aria-expanded',String(b.dataset.calendarDate===selected)));
  panel.hidden=!selected;if(!selected)return;
  const games=data.games.filter(g=>g.gameDate===selected);
- panel.innerHTML=`<div class="calendar-detail-head"><h3>${Number(selected.slice(5,7))}월 ${Number(selected.slice(8))}일</h3><button class="text-button" data-calendar-close aria-label="날짜 상세 닫기">닫기 ×</button></div>${games.length?games.map(row).join(''):`<div class="empty">${data.stale?'이 날짜의 경기 정보를 확인하지 못했어요.':'이 날짜에 등록된 경기가 없어요.'}</div>`}`;
+ panel.innerHTML=`<div class="calendar-detail-head"><h3>${Number(selected.slice(5,7))}월 ${Number(selected.slice(8))}일</h3><button class="text-button" data-calendar-close aria-label="날짜 상세 닫기">닫기 ×</button></div>${games.length?games.map((game,index)=>row(game)+exportMarkup(game,index)).join(''):`<div class="empty">${data.stale?'이 날짜의 경기 정보를 확인하지 못했어요.':'이 날짜에 등록된 경기가 없어요.'}</div>`}`;
+}
+function exportMarkup(game,index){
+ const result=createGameCalendarFile(game,{...data,online:navigator.onLine});
+ const noteId='calendarExportNote-'+index;
+ return `<div class="calendar-export"><button class="text-button" data-calendar-export="${esc(game.gameId)}" aria-describedby="${noteId}" ${result.ok?'':'disabled'}>일정 파일 다운로드 (.ics)</button><p id="${noteId}" class="small muted">${result.ok?'개인 캘린더에 추가할 수 있어요. 다운로드 후 변경은 자동 반영되지 않습니다.':esc(result.message)}</p><p data-export-status role="status" class="small muted"></p></div>`;
+}
+function downloadCalendar(button){
+ const status=button.parentElement.querySelector('[data-export-status]');
+ const game=data?.games.find(g=>g.gameId===button.dataset.calendarExport);
+ const result=createGameCalendarFile(game,{...data,online:navigator.onLine});
+ if(!result.ok){status.textContent=result.message;return;}
+ let url;
+ try{
+  url=URL.createObjectURL(new Blob([result.content],{type:'text/calendar;charset=utf-8'}));
+  const link=document.createElement('a');link.href=url;link.download=result.filename;
+  document.body.append(link);link.click();link.remove();
+  status.textContent='다운로드를 요청했어요. 받은 파일을 캘린더 앱에서 열어 주세요.';
+ }catch{status.textContent='파일을 받지 못했어요. 브라우저 다운로드 설정을 확인하고 다시 시도해 주세요.';}
+ finally{if(url)setTimeout(()=>URL.revokeObjectURL(url),30000);}
 }
 function draw(){
  if(!data)return;
@@ -24,6 +44,7 @@ function draw(){
  }).join('')}</div><div id="calendarDetail" class="calendar-detail" aria-live="polite" hidden></div><p class="calendar-note">두 점은 원정·홈 구단 순서 · ${(data.from||data.today).slice(5)}–${(data.to||data.today).slice(5)} 조회${data.stale?' · 갱신 지연':''}</p>`;detail();
 }
 document.addEventListener('click',e=>{
+ const download=e.target.closest('[data-calendar-export]');if(download){downloadCalendar(download);return;}
  const tab=e.target.closest('[data-calendar-view]'),step=e.target.closest('[data-calendar-step]'),day=e.target.closest('[data-calendar-date]'),close=e.target.closest('[data-calendar-close]');
  if(tab){view=tab.dataset.calendarView;document.querySelectorAll('[data-calendar-view]').forEach(b=>b.setAttribute('aria-pressed',String(b===tab)));draw()}
  if(step&&data){const [y,m]=month.split('-').map(Number);month=new Date(Date.UTC(y,m-1+Number(step.dataset.calendarStep),1)).toISOString().slice(0,7);selected='';draw()}

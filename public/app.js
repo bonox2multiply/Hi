@@ -1,4 +1,4 @@
-import { liveSummary, pregameEstimate } from '/live-model.js?v=22';
+import { liveSummary, pregameEstimate } from '/live-model.js?v=23';
 // prettier-ignore
 import {esc,primaryName,isHome,opponent,side,scores,isLive,status,outcome,numeric,occupied,tally,cumulative,filterPlays,gameLabel,summarizeGame} from '/model.js';
 const pregameCache = new Map(),
