@@ -1250,7 +1250,7 @@ function renderNews() {
         .slice(0, newsLimit)
         .map((a) => newsCard(a))
         .join('')
-    : `<div class="panel empty"><span class="news-error-icon" aria-hidden="true">◇</span>${newsFilter === 'saved' ? '저장한 기사가 없어요. 기사 오른쪽 북마크를 눌러 보세요.' : newsQuery ? '검색어와 일치하는 기사가 없어요.' : newsData ? '선택한 분류에 최근 7일 기사가 없어요.' : '뉴스를 불러오지 못했어요. 잠시 후 다시 확인해 주세요.'}${!newsData ? '<div><a href="https://www.yna.co.kr/sports/baseball" target="_blank" rel="noopener noreferrer">연합뉴스 야구 ↗</a><a href="https://www.donga.com/news/Sports" target="_blank" rel="noopener noreferrer">동아일보 스포츠 ↗</a></div>' : ''}</div>`;
+    : `<div class="panel empty"><span class="news-error-icon" aria-hidden="true">◇</span>${newsQuery ? '검색어와 일치하는 기사가 없어요.' : newsFilter === 'saved' ? '저장한 기사가 없어요. 기사 오른쪽 북마크를 눌러 보세요.' : newsData ? '선택한 분류에 최근 7일 기사가 없어요.' : '뉴스를 불러오지 못했어요. 잠시 후 다시 확인해 주세요.'}${!newsData ? '<div><a href="https://www.yna.co.kr/sports/baseball" target="_blank" rel="noopener noreferrer">연합뉴스 야구 ↗</a><a href="https://www.donga.com/news/Sports" target="_blank" rel="noopener noreferrer">동아일보 스포츠 ↗</a></div>' : ''}</div>`;
   $('newsMore').hidden = articles.length <= newsLimit;
   $('newsMore').textContent = `기사 더 보기 · ${Math.max(0, articles.length - newsLimit)}개 남음`;
   $('newsUpdated').textContent = newsData
