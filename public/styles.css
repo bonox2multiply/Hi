@@ -181,3 +181,5 @@ html[data-motion=off] .calendar-day{transition:none;transform:none}
 .pregame-rosters{display:grid;grid-template-columns:1fr 1fr;gap:16px}.pregame-rosters ol{padding-left:22px}.pregame-rosters li{padding:3px 0}.win-estimate a{color:var(--red)}
 
 .calendar-export{padding:8px 18px 16px;border-bottom:1px solid var(--line)}.calendar-export p{margin:4px 0;line-height:1.7}.calendar-export button:disabled{opacity:.6;cursor:not-allowed}
+
+#calendarBulkExport{margin-bottom:16px;padding-top:12px}#calendarBulkExport button{white-space:normal;text-align:left}
