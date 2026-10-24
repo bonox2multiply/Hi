@@ -14,7 +14,7 @@ async function controlledPage(page){
 test('installed shell opens offline without caching API responses',async({page,context})=>{
   await controlledPage(page);
   const title=await page.title();
-  await page.evaluate(()=>fetch('/api/games').catch(()=>{}));
+  expect(await page.evaluate(async()=>(await fetch('/api/games?test-cache=1')).status)).toBe(200);
   const keys=await page.evaluate(async()=>{
     const names=await caches.keys();
     return (await Promise.all(names.map(async name=>(await (await caches.open(name)).keys()).map(r=>new URL(r.url).pathname)))).flat();

@@ -2,6 +2,7 @@ import http from 'node:http';
 import worker from '../../dist/server/index.js';
 // Serve the actual build. Browser fixtures handle APIs; never call a live provider here.
 http.createServer(async(req,res)=>{
+  if(req.url==='/api/games?test-cache=1'){res.writeHead(200,{'Content-Type':'application/json'}).end('{"games":[],"stale":false}');return;}
   if(req.url.startsWith('/api/')){res.writeHead(503).end('{}');return;}
   try{
     const response=await worker.fetch(new Request(new URL(req.url,'http://127.0.0.1:4177'),{method:req.method}));
