@@ -4,6 +4,7 @@ import {dateWindow,getGames} from './api.js';
 import {getRelay} from './relay.js';
 import {fetchVideos,videoDays} from './videos.js';
 import {fetchNews} from './news.js';
+import {getGameRecap,validRecapRequest} from './recap.js';
 import {fetchStandings} from './standings.js';
 // The build embeds validated static assets and fallback snapshots here.
 const pending=new Map(),memory=new Map();
@@ -15,6 +16,13 @@ function remember(key,data,request,ctx){if(memory.size>70)memory.delete(memory.k
 async function coalesce(key,fn){if(pending.has(key))return pending.get(key);const promise=fn().finally(()=>pending.delete(key));pending.set(key,promise);return promise}
 export default {async fetch(request,env,ctx){
  const url=new URL(request.url);if(!['GET','HEAD'].includes(request.method))return new Response('Method not allowed',{status:405,headers:{...common,Allow:'GET, HEAD'}});
+ if(url.pathname==='/api/recap'){
+  const id=url.searchParams.get('gameId'),date=url.searchParams.get('date');
+  if(!validRecapRequest(id,date))return json({error:'경기와 날짜를 확인해 주세요.'},400);
+  const key='recap-v1-'+id+'-'+date,cached=await remembered(key,request);
+  if(cached&&Date.now()-Date.parse(cached.fetchedAt)<60000)return json(cached);
+  try{const d=await coalesce(key,()=>getGameRecap(id,date));if(d.recap.available)remember(key,d,request,ctx);return json(d)}catch{return cached?json({...cached,stale:true,recap:{...cached.recap,stale:true}}):json({error:'경기 요약 연결이 지연되고 있어요.'},503)}
+ }
  if(url.pathname==='/api/pregame'){
   const id=url.searchParams.get('gameId')||'';
   if(!/^\d{8}[A-Z]{4}\d{5}$/.test(id))return json({error:'잘못된 경기입니다.'},400);
@@ -68,6 +76,6 @@ export default {async fetch(request,env,ctx){
   const cached=await remembered('standings',request);if(cached&&Date.now()-Date.parse(cached.fetchedAt)<300000)return json(cached);
   try{const d=await coalesce('standings',()=>fetchStandings(cached||rankSnapshot));remember('standings',d,request,ctx);return json(d)}catch{return json({...cached||rankSnapshot,stale:true})}
  }
- const asset=assets[url.pathname];if(asset)return new Response(request.method==='HEAD'?null:asset.body,{headers:{...common,'Content-Type':asset.type,'Cache-Control':url.searchParams.get('v')==='25'&&!['/','/sw.js'].includes(url.pathname)?'public,max-age=31536000,immutable':'no-cache',...(url.pathname==='/sw.js'?{'Service-Worker-Allowed':'/'}:{})}});
+ const asset=assets[url.pathname];if(asset)return new Response(request.method==='HEAD'?null:asset.body,{headers:{...common,'Content-Type':asset.type,'Cache-Control':url.searchParams.get('v')==='26'&&!['/','/sw.js'].includes(url.pathname)?'public,max-age=31536000,immutable':'no-cache',...(url.pathname==='/sw.js'?{'Service-Worker-Allowed':'/'}:{})}});
  return new Response('Not found',{status:404,headers:common});
 }};

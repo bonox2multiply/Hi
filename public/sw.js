@@ -1,16 +1,16 @@
-const CACHE = 'kia-diamond-shell-v25',
+const CACHE = 'kia-diamond-shell-v26',
   SHELL = [
-    '/live-model.js?v=25',
-    '/calendar.js?v=25',
-    '/calendar-export.js?v=25',
-    '/settings.js?v=25',
+    '/live-model.js?v=26',
+    '/calendar.js?v=26',
+    '/calendar-export.js?v=26',
+    '/settings.js?v=26',
     '/',
-    '/app.js?v=25',
+    '/app.js?v=26',
     '/model.js',
-    '/navigation.js?v=25',
-    '/postseason.js?v=25',
-    '/styles.css?v=25',
-    '/icon.svg?v=25',
+    '/navigation.js?v=26',
+    '/postseason.js?v=26',
+    '/styles.css?v=26',
+    '/icon.svg?v=26',
     '/manifest.webmanifest'
   ];
 self.addEventListener('install', (event) => {
@@ -51,7 +51,7 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     (async () => {
       const cache = await caches.open(CACHE);
-      const versioned = u.searchParams.get('v') === '25';
+      const versioned = u.searchParams.get('v') === '26';
       if (versioned) {
         const hit = await cache.match(event.request);
         if (hit) return hit;
