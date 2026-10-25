@@ -1,6 +1,7 @@
-import { liveSummary, pregameEstimate } from '/live-model.js?v=25';
+import { liveSummary, pregameEstimate } from '/live-model.js?v=26';
 // prettier-ignore
 import {esc,primaryName,isHome,opponent,side,scores,isLive,status,outcome,numeric,occupied,tally,cumulative,filterPlays,gameLabel,summarizeGame} from '/model.js';
+const recapEntries = new Map();
 const pregameCache = new Map(),
   pregamePending = new Set(),
   pregameAttempt = new Map();
@@ -505,11 +506,32 @@ function compare(label, a, b) {
     sum = (ka || 0) + (kb || 0);
   return `<div class="comparison-label"><b>${val(a)}</b><span>${label}</span><b>${val(b)}</b></div><div class="comparison-track" role="img" aria-label="${esc(primaryName(selectedGame()))} ${label} ${ka ?? '미확인'}, 상대 ${kb ?? '미확인'}">${ka !== null && kb !== null && sum ? `<span style="flex:${ka}"></span><span style="flex:${kb}"></span>` : ''}</div>`;
 }
+function recapKey(g) {
+  return [g.gameId,g.gameDate,g.statusCode,g.homeTeamScore,g.awayTeamScore,!!g.cancel,!!g.suspended].join('|');
+}
+function serverRecap(g, d) {
+  const fallback = summarizeGame(g,d);
+  if (!fallback.available) return {recap:fallback,note:''};
+  const key = recapKey(g), entry = recapEntries.get(key);
+  if (entry && (entry.pending || Date.now()-entry.time < 60000)) return {recap:entry.data?.recap || fallback,note:entry.pending?'서버에서 경기 요약을 확인하고 있어요. 현재는 기기의 기록 요약입니다.':entry.error?'서버 요약 연결 지연 · 기기에 있는 기록으로 요약했습니다.':entry.data.stale?'서버 연결 지연 · 마지막으로 확인한 요약입니다.':'서버 API가 확인된 경기 기록을 바탕으로 작성했습니다.'};
+  if(recapEntries.size>=30)recapEntries.delete(recapEntries.keys().next().value);
+  const state={pending:true,time:Date.now(),data:null,error:false};recapEntries.set(key,state);
+  fetchJSON('/api/recap?'+new URLSearchParams({gameId:g.gameId,date:g.gameDate}),30000).then(data=>{
+    const r=data?.recap;
+    if(data.gameId!==g.gameId || data.gameDate!==g.gameDate || !r?.available || typeof r.title!=='string' || typeof r.lead!=='string' || !Array.isArray(r.bullets) || r.kia!==fallback.kia || r.other!==fallback.other)throw Error('Unconfirmed recap');
+    state.data=data;
+  }).catch(()=>{state.error=true}).finally(()=>{
+    state.pending=false;state.time=Date.now();
+    if(selectedGame()?.gameId===g.gameId)renderSummary();
+    renderFeaturedRecap();
+  });
+  return {recap:fallback,note:'서버에서 경기 요약을 확인하고 있어요. 현재는 기기의 기록 요약입니다.'};
+}
 function recapMarkup(g, d) {
-  const r = summarizeGame(g, d);
+  const {recap:r,note} = serverRecap(g,d);
   if (!r.available)
     return `<div class="auto-recap-pending"><strong>경기 기록을 기다리고 있어요.</strong>${esc(r.reason || '최종 점수가 확정되면 결과와 주요 이닝을 자동으로 요약합니다.')}</div>`;
-  return `<article class="auto-recap"><div class="recap-label">GAME RECAP <span>기록 기반 자동 요약</span></div><h3>${esc(r.title)}</h3><p class="recap-lead">${esc(r.lead)}</p>${r.bullets.length ? `<ul class="recap-points">${r.bullets.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}<div class="recap-chips"><span class="recap-chip">결과<b>${esc(r.result)}</b></span><span class="recap-chip">점수 차<b>${r.margin}점</b></span>${r.burst ? `<span class="recap-chip">${r.limited ? '확인된 득점' : '최다 득점'}<b>${r.burst.inning}회 · ${r.burst.runs}점</b></span>` : ''}</div><p class="recap-note">네이버 스포츠의 최종 점수·이닝 기록을 바탕으로 자동 작성했습니다.${r.limited ? ' 상세 이닝 기록이 부족해 확인된 내용만 요약했습니다.' : ''}${lastData?.stale || r.stale ? ' 갱신 지연 중인 마지막 확인 기록입니다.' : ''}</p></article>`;
+  return `<article class="auto-recap"><div class="recap-label">GAME RECAP <span>기록 기반 자동 요약</span></div><h3>${esc(r.title)}</h3><p class="recap-lead">${esc(r.lead)}</p>${r.bullets.length ? `<ul class="recap-points">${r.bullets.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}<div class="recap-chips"><span class="recap-chip">결과<b>${esc(r.result)}</b></span><span class="recap-chip">점수 차<b>${r.margin}점</b></span>${r.burst ? `<span class="recap-chip">${r.limited ? '확인된 득점' : '최다 득점'}<b>${r.burst.inning}회 · ${r.burst.runs}점</b></span>` : ''}</div><p class="recap-note" role="status">${esc(note)}</p><p class="recap-note">네이버 스포츠의 최종 점수·이닝 기록을 바탕으로 자동 작성했습니다.${r.limited ? ' 상세 이닝 기록이 부족해 확인된 내용만 요약했습니다.' : ''}${lastData?.stale || r.stale ? ' 갱신 지연 중인 마지막 확인 기록입니다.' : ''}</p></article>`;
 }
 function summaryEventText(p) {
   const key = p.lines.filter((l) => /홈런|득점|홈인|적시|끝내기/.test(l.text));
@@ -567,9 +589,9 @@ function renderFeaturedRecap() {
       '<div class="recap-overline">AFTER THE GAME <span>↗</span></div><div class="recap-empty-art" aria-hidden="true">◇</div><h2>마지막 아웃 뒤,<br>경기의 이야기가 남아.</h2><p class="recap-copy">조회 범위에 종료된 경기가 없어요. 경기가 끝나면 여기에 요약이 표시됩니다.</p><a href="#games" data-page="games" class="recap-link">경기 일정 보기 <span>↗</span></a>';
     return;
   }
-  const r = summarizeGame(g, relayData?.gameId === g.gameId ? relayData : null);
+  const {recap:r,note} = serverRecap(g, relayData?.gameId === g.gameId ? relayData : null);
   $('featuredRecap').innerHTML =
-    `<div class="recap-overline">LAST GAME RECAP <span>↗</span></div><p class="recap-date">${short(g.gameDate)} (${weekday(g.gameDate)}) · ${esc(g.stadium || '구장 미정')}${lastData?.stale ? ' · 마지막 확인 기록' : ''}</p><h2>${esc(r.available ? r.title : '최종 기록 확인 중')}</h2>${r.available ? `<div class="recap-result"><b>${r.kia}<span style="border:0;padding:0;font-size:28px;color:var(--hero-muted)"> : </span>${r.other}</b><span>${esc(r.result)}</span></div><p class="recap-copy">${esc(r.bullets[0] || r.lead)}</p>` : ''}<button class="recap-link" data-game="${esc(g.gameId)}">종료 요약 읽기 <span>↗</span></button>`;
+    `<div class="recap-overline">LAST GAME RECAP <span>↗</span></div><p class="recap-date">${short(g.gameDate)} (${weekday(g.gameDate)}) · ${esc(g.stadium || '구장 미정')}${lastData?.stale ? ' · 마지막 확인 기록' : ''}</p><h2>${esc(r.available ? r.title : '최종 기록 확인 중')}</h2>${r.available ? `<div class="recap-result"><b>${r.kia}<span style="border:0;padding:0;font-size:28px;color:var(--hero-muted)"> : </span>${r.other}</b><span>${esc(r.result)}</span></div><p class="recap-copy">${esc(r.bullets[0] || r.lead)}</p>` : ''}<p class="recap-note">${esc(note)}</p><button class="recap-link" data-game="${esc(g.gameId)}">종료 요약 읽기 <span>↗</span></button>`;
 }
 function setTab(tab) {
   activeTab = tab;
@@ -1003,6 +1025,7 @@ async function refreshRelay(force = false) {
   return promise;
 }
 async function refreshAll(manual = false) {
+  if(manual)for(const [key,entry] of recapEntries)if(!entry.pending)recapEntries.delete(key);
   if (document.documentElement.dataset.season === 'postseason') return;
   $('refresh').disabled = true;
   $('refresh').classList.add('busy');

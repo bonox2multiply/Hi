@@ -23,8 +23,8 @@ const assets = Object.fromEntries(
   ])
 );
 assets['/robots.txt'] = { body: 'User-agent: *\nDisallow: /', type: 'text/plain' };
-const helpers = ['pregame', 'clips', 'api', 'relay', 'standings', 'news', 'videos', 'postseason']
-  .map((n) => fs.readFileSync('worker/' + n + '.js', 'utf8').replaceAll('export ', ''))
+const helpers = ['pregame', 'clips', 'api', 'relay', 'standings', 'news', 'videos', 'postseason', 'recap']
+  .map((n) => fs.readFileSync('worker/' + n + '.js', 'utf8').replaceAll('export ', '').replace(/^import .*;\n/gm, ''))
   .join('\n');
 const videosSnapshot = JSON.parse(fs.readFileSync('worker/videos-snapshot.json', 'utf8'));
 const newsSnapshot = JSON.parse(fs.readFileSync('worker/news-snapshot.json', 'utf8'));
@@ -33,7 +33,7 @@ const snapshot = JSON.parse(fs.readFileSync('worker/snapshot.json', 'utf8')),
   rankSnapshot = JSON.parse(fs.readFileSync('worker/standings-snapshot.json', 'utf8'));
 fs.writeFileSync(
   'dist/server/index.js',
-  helpers +
+  'const recapModel = (() => {\n' + fs.readFileSync('public/model.js', 'utf8').replaceAll('export ', '') + '\nreturn {summarizeGame};})();\n' + helpers +
     '\nconst assets=' +
     JSON.stringify(assets) +
     ';\nconst snapshot=' +
