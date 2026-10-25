@@ -183,3 +183,23 @@ html[data-motion=off] .calendar-day{transition:none;transform:none}
 .calendar-export{padding:8px 18px 16px;border-bottom:1px solid var(--line)}.calendar-export p{margin:4px 0;line-height:1.7}.calendar-export button:disabled{opacity:.6;cursor:not-allowed}
 
 #calendarBulkExport{margin-bottom:16px;padding-top:12px}#calendarBulkExport button{white-space:normal;text-align:left}
+
+/* Approved mobile postseason labels and compact information hierarchy. */
+.ps-round-short{display:none}
+@media(max-width:760px){
+  .ps-round-tabs{box-sizing:border-box;gap:0;padding:6px;width:100%;max-width:100%}
+  html[data-season=postseason] .ps-round-tabs.liquid-tabs:not(.mobile-nav)>button,html[data-season=postseason] .ps-round-tabs.liquid-tabs:not(.mobile-nav)>button[aria-pressed=true]{flex:1 1 0;min-width:0;padding:9px 2px;font-size:11px;letter-spacing:0}
+  .ps-round-full{display:none}.ps-round-short{display:inline}
+  html[data-season=postseason] .page-intro{margin-bottom:14px}
+  html[data-season=postseason] .page-intro h1{font-size:26px}
+  html[data-season=postseason] .ps-masthead{margin-bottom:10px;padding-bottom:10px}
+  html[data-season=postseason] .ps-update{margin-bottom:16px;gap:8px;flex-wrap:wrap}
+  .ps-home-grid{gap:12px;margin-bottom:12px}
+  .ps-featured .ps-match{padding:18px 8px}
+  .ps-side-feature{padding:16px;gap:6px}
+  .ps-side-feature .eyebrow{margin-bottom:0}
+  .ps-side-feature h2{font-size:20px;line-height:1.35}
+  .ps-side-feature .text-button{min-height:44px}
+  html[data-season=postseason] .win-estimate{margin-top:14px;padding:16px}
+  html[data-season=postseason] .ps-stat-grid>div{padding:12px}
+}
