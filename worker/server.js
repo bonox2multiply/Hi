@@ -76,6 +76,6 @@ export default {async fetch(request,env,ctx){
   const cached=await remembered('standings',request);if(cached&&Date.now()-Date.parse(cached.fetchedAt)<300000)return json(cached);
   try{const d=await coalesce('standings',()=>fetchStandings(cached||rankSnapshot));remember('standings',d,request,ctx);return json(d)}catch{return json({...cached||rankSnapshot,stale:true})}
  }
- const asset=assets[url.pathname];if(asset)return new Response(request.method==='HEAD'?null:asset.body,{headers:{...common,'Content-Type':asset.type,'Cache-Control':url.searchParams.get('v')==='26'&&!['/','/sw.js'].includes(url.pathname)?'public,max-age=31536000,immutable':'no-cache',...(url.pathname==='/sw.js'?{'Service-Worker-Allowed':'/'}:{})}});
+ const asset=assets[url.pathname];if(asset)return new Response(request.method==='HEAD'?null:asset.body,{headers:{...common,'Content-Type':asset.type,'Cache-Control':url.searchParams.get('v')==='27'&&!['/','/sw.js'].includes(url.pathname)?'public,max-age=31536000,immutable':'no-cache',...(url.pathname==='/sw.js'?{'Service-Worker-Allowed':'/'}:{})}});
  return new Response('Not found',{status:404,headers:common});
 }};

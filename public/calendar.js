@@ -1,5 +1,5 @@
 import {esc} from '/model.js';
-import {createGameCalendarFile,createGamesCalendarFile} from '/calendar-export.js?v=26';
+import {createGameCalendarFile,createGamesCalendarFile} from '/calendar-export.js?v=27';
 const $=id=>document.getElementById(id);
 const colors={HT:'#e23851',LG:'#c15b9b',OB:'#527bd5',SS:'#3289f5',KT:'#71798b',SK:'#df542e',HH:'#f49c32',NC:'#36aaaf',LT:'#50a9de',WO:'#a679d7'};
 let data=null,row=null,month='',selected='',view='month';
