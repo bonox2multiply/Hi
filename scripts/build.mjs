@@ -23,7 +23,7 @@ const assets = Object.fromEntries(
   ])
 );
 assets['/robots.txt'] = { body: 'User-agent: *\nDisallow: /', type: 'text/plain' };
-const helpers = ['pregame', 'clips', 'api', 'relay', 'standings', 'news', 'videos', 'postseason', 'recap']
+const helpers = ['schedule', 'pregame', 'clips', 'api', 'relay', 'standings', 'news', 'videos', 'postseason', 'recap']
   .map((n) => fs.readFileSync('worker/' + n + '.js', 'utf8').replaceAll('export ', '').replace(/^import .*;\n/gm, ''))
   .join('\n');
 const videosSnapshot = JSON.parse(fs.readFileSync('worker/videos-snapshot.json', 'utf8'));

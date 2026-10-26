@@ -47,17 +47,17 @@ export default {async fetch(request,env,ctx){
  if(url.pathname==='/api/postseason'){
   const now=new Date(),today=dateWindow(now).today,key='postseason',cached=await remembered(key,request);
   if(cached&&cached.today===today&&Date.now()-Date.parse(cached.fetchedAt)<20000)return json(cached);
-  try{const d=await coalesce(key,()=>fetchPostseason());remember(key,d,request,ctx);return json(d)}catch{return json({...postseasonState(cached?.games||[],today),rounds:PS_ROUNDS,fetchedAt:cached?.fetchedAt||null,stale:true})}
+  try{const d=await coalesce(key,()=>fetchPostseason());if(!d.stale)remember(key,d,request,ctx);return json(d)}catch{return json({...postseasonState(cached?.games||[],today),rounds:PS_ROUNDS,fetchedAt:cached?.fetchedAt||null,stale:true})}
  }
  if(url.pathname==='/api/postseason/news'||url.pathname==='/api/postseason/videos'){
   const video=url.pathname.endsWith('/videos'),key=video?'ps-videos':'ps-news',cached=await remembered(key,request);
   if(cached&&Date.now()-Date.parse(cached.fetchedAt)<300000)return json(cached);
-  try{const d=await coalesce(key,async()=>video?fetchVideos(fetch,new Date(),(await (async()=>{const ps=await remembered('postseason',request);if(ps&&ps.today===dateWindow().today&&Date.now()-Date.parse(ps.fetchedAt)<120000)return ps;const fresh=await coalesce('postseason',()=>fetchPostseason());remember('postseason',fresh,request,ctx);return fresh})()).games):fetchNews(fetch,new Date(),true));remember(key,d,request,ctx);return json(d)}catch{return cached?json({...cached,stale:true}):json({error:'연결이 지연되고 있어요. 잠시 후 다시 확인해 주세요.'},503)}
+  try{const d=await coalesce(key,async()=>video?fetchVideos(fetch,new Date(),(await (async()=>{const ps=await remembered('postseason',request);if(ps&&ps.today===dateWindow().today&&Date.now()-Date.parse(ps.fetchedAt)<120000)return ps;const fresh=await coalesce('postseason',()=>fetchPostseason());if(!fresh.stale)remember('postseason',fresh,request,ctx);return fresh})()).games):fetchNews(fetch,new Date(),true));remember(key,d,request,ctx);return json(d)}catch{return cached?json({...cached,stale:true}):json({error:'연결이 지연되고 있어요. 잠시 후 다시 확인해 주세요.'},503)}
  }
  if(url.pathname==='/api/games'){
   const days=url.searchParams.get('days')==='30'?30:7,now=new Date(),w=dateWindow(now,days),key='games-'+days,cached=await remembered(key,request);
   if(cached&&cached.today===w.today&&Date.now()-Date.parse(cached.fetchedAt)<20000)return json(cached);
-  try{const d=await coalesce(key,()=>getGames(now,fetch,days));remember(key,d,request,ctx);return json(d)}catch{const fallback=cached||snapshot;return json({...fallback,...w,games:fallback.games.filter(g=>g.gameDate>=w.from&&g.gameDate<=w.to),stale:true})}
+  try{const d=await coalesce(key,()=>getGames(now,fetch,days));if(!d.stale)remember(key,d,request,ctx);return json(d)}catch{const fallback=cached||snapshot;return json({...fallback,...w,games:fallback.games.filter(g=>g.gameDate>=w.from&&g.gameDate<=w.to),stale:true})}
  }
  if(url.pathname==='/api/relay'){
   const id=url.searchParams.get('gameId')||'';if(!validId(id))return json({error:'잘못된 경기입니다.'},400);
@@ -76,6 +76,6 @@ export default {async fetch(request,env,ctx){
   const cached=await remembered('standings',request);if(cached&&Date.now()-Date.parse(cached.fetchedAt)<300000)return json(cached);
   try{const d=await coalesce('standings',()=>fetchStandings(cached||rankSnapshot));remember('standings',d,request,ctx);return json(d)}catch{return json({...cached||rankSnapshot,stale:true})}
  }
- const asset=assets[url.pathname];if(asset)return new Response(request.method==='HEAD'?null:asset.body,{headers:{...common,'Content-Type':asset.type,'Cache-Control':url.searchParams.get('v')==='27'&&!['/','/sw.js'].includes(url.pathname)?'public,max-age=31536000,immutable':'no-cache',...(url.pathname==='/sw.js'?{'Service-Worker-Allowed':'/'}:{})}});
+ const asset=assets[url.pathname];if(asset)return new Response(request.method==='HEAD'?null:asset.body,{headers:{...common,'Content-Type':asset.type,'Cache-Control':url.searchParams.get('v')==='28'&&!['/','/sw.js'].includes(url.pathname)?'public,max-age=31536000,immutable':'no-cache',...(url.pathname==='/sw.js'?{'Service-Worker-Allowed':'/'}:{})}});
  return new Response('Not found',{status:404,headers:common});
 }};

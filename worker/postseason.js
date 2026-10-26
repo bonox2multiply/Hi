@@ -1,3 +1,4 @@
+import {loadSchedule,scheduleKstDate} from './schedule.js';
 export const PS_ROUNDS = [
   { id: 'wc', name: '와일드카드', code: 'WC', rule: '4위는 1승 또는 1무 · 5위는 2승' },
   { id: 'semi', name: '준플레이오프', code: '준PO', rule: '5전 3선승' },
@@ -43,38 +44,7 @@ export function postseasonState(games, today) {
   };
 }
 export async function fetchPostseason(fetcher = fetch, now = new Date()) {
-  const today = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'Asia/Seoul',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    }).format(now),
-    year = today.slice(0, 4);
-  const params = new URLSearchParams({
-    fields: 'basic,schedule,baseball',
-    upperCategoryId: 'kbaseball',
-    categoryId: 'kbo',
-    fromDate: year + '-09-01',
-    toDate: year + '-12-15',
-    size: '500'
-  });
-  const r = await fetcher('https://api-gw.sports.naver.com/schedule/games?' + params, {
-    headers: { Accept: 'application/json' },
-    signal: AbortSignal.timeout(12000)
-  });
-  if (!r.ok) throw Error('Schedule unavailable');
-  const p = await r.json();
-  if (
-    !p.success ||
-    !Array.isArray(p.result?.games) ||
-    p.result.gameTotalCount > p.result.games.length
-  )
-    throw Error('Incomplete postseason schedule');
-  return {
-    ...postseasonState(p.result.games, today),
-    fetchedAt: now.toISOString(),
-    stale: false,
-    source: '네이버 스포츠',
-    rounds: PS_ROUNDS
-  };
+  const today=scheduleKstDate(now),year=today.slice(0,4);
+  const loaded=await loadSchedule(year+'-09-01',year+'-12-15',fetcher);
+  return {...loaded,...postseasonState(loaded.games,today),fetchedAt:now.toISOString(),source:'네이버 스포츠',rounds:PS_ROUNDS};
 }

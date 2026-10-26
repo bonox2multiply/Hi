@@ -193,7 +193,7 @@ function render() {
     next = games.filter((g) => g.statusCode === 'BEFORE' && !g.cancel && g.gameDate >= data?.today),
     last = games.filter((g) => g.statusCode === 'RESULT').at(-1),
     main = live.length ? live : today.length ? today : next.slice(0, 1);
-  let html = `<div class="ps-masthead"><span><i></i> ${data?.year || ''} POSTSEASON</span><span>EVERY GAME. ONE DREAM.</span></div><div class="ps-update" role="status">${data?.stale ? '최신 일정 연결 지연 · 마지막 확인 기록입니다.' : loading ? '업데이트 중…' : '진행 경기 30초 · 그 외 2분마다 갱신'} · ${when(data?.fetchedAt)} <button class="text-button" data-ps-refresh>새로고침 ↻</button></div>`;
+  let html = `<div class="ps-masthead"><span><i></i> ${data?.year || ''} POSTSEASON</span><span>EVERY GAME. ONE DREAM.</span></div><div class="ps-update" role="status">${data?.partial ? '일부 기간의 일정 연결 지연 · 확인된 경기만 표시합니다.' : data?.stale ? '최신 일정 연결 지연 · 마지막 확인 기록입니다.' : loading ? '업데이트 중…' : '진행 경기 30초 · 그 외 2분마다 갱신'} · ${when(data?.fetchedAt)} <button class="text-button" data-ps-refresh>새로고침 ↻</button></div>`;
   if (page === 'home')
     html += `<div class="ps-home-grid"><div>${
       main.length
