@@ -79,17 +79,17 @@ test('30-day schedule window crosses years using Korean calendar date', () => {
   assert.equal(dateWindow(new Date(), 1000).windowDays, 7);
 });
 test('expanded schedule actually asks the provider for the 30-day range', async () => {
-  let url;
+  const urls=[];
   const d = await getGames(
     new Date('2026-10-12T10:00:00Z'),
     async (u) => {
-      url = new URL(u);
+      urls.push(new URL(u));
       return Response.json({ success: true, result: { games: [game], gameTotalCount: 1 } });
     },
     30
   );
-  assert.equal(url.searchParams.get('fromDate'), '2026-09-12');
-  assert.equal(url.searchParams.get('toDate'), '2026-11-11');
+  assert.equal(urls[0].searchParams.get('fromDate'), '2026-09-12');
+  assert.equal(urls.at(-1).searchParams.get('toDate'), '2026-11-11');
   assert.equal(d.games.length, 1);
   assert.equal(d.windowDays, 30);
 });

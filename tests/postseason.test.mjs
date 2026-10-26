@@ -42,9 +42,9 @@ test('automatic mode activates at KST postseason start including rest days and d
   assert.equal(postseasonState([game], '2027-03-01').active, false);
 });
 test('league-wide feed retains non-KIA postseason games and rejects incomplete data', async () => {
-  let url;
+  const urls=[];
   const d = await fetchPostseason(async (u) => {
-    url = u;
+    urls.push(u);
     return Response.json({
       success: true,
       result: { games: [game, { ...game, roundCode: 'kbo_r' }], gameTotalCount: 2 }
@@ -53,7 +53,8 @@ test('league-wide feed retains non-KIA postseason games and rejects incomplete d
   assert.equal(d.today, '2026-10-14');
   assert.equal(d.games.length, 1);
   assert.equal(d.games[0].awayTeamCode, 'OB');
-  assert.match(url, /fromDate=2026-09-01/);
+  assert.equal(urls.length,4);
+  assert.match(urls[0], /fromDate=2026-09-01/);
   await assert.rejects(
     fetchPostseason(async () =>
       Response.json({ success: true, result: { games: [], gameTotalCount: 10 } })

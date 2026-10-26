@@ -1,16 +1,16 @@
-const CACHE = 'kia-diamond-shell-v26',
+const CACHE = 'kia-diamond-shell-v28',
   SHELL = [
-    '/live-model.js?v=26',
-    '/calendar.js?v=26',
-    '/calendar-export.js?v=26',
-    '/settings.js?v=26',
+    '/live-model.js?v=28',
+    '/calendar.js?v=28',
+    '/calendar-export.js?v=28',
+    '/settings.js?v=28',
     '/',
-    '/app.js?v=26',
+    '/app.js?v=28',
     '/model.js',
-    '/navigation.js?v=26',
-    '/postseason.js?v=26',
-    '/styles.css?v=26',
-    '/icon.svg?v=26',
+    '/navigation.js?v=28',
+    '/postseason.js?v=28',
+    '/styles.css?v=28',
+    '/icon.svg?v=28',
     '/manifest.webmanifest'
   ];
 self.addEventListener('install', (event) => {
