@@ -304,7 +304,11 @@ async function refresh(force = false) {
   if (loading) return;
   loading = true;
   try {
-    data = await read('/api/postseason');
+    const next = await read('/api/postseason');
+    const sameSeason = data?.year === next.year && typeof next.year === 'string';
+    data = next.stale && next.games?.length === 0 && data?.games?.length && sameSeason
+      ? { ...next, games: data.games, start: data.start, ended: data.ended, fetchedAt: data.fetchedAt }
+      : next;
   } catch {
     data = {
       ...data,

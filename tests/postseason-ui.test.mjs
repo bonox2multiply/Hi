@@ -105,7 +105,7 @@ function harness() {
   vm.createContext(c);
   vm.runInContext(
     fs.readFileSync('public/postseason.js', 'utf8').replace(/^import.*\n/, '') +
-      '\nglobalThis.ready=()=>new Promise(r=>setTimeout(r,0));globalThis.testSet=(s)=>{if(s.page)page=s.page;if(s.mode)mode=s.mode;if(s.newsTeam)newsTeam=s.newsTeam;if(s.round)round=s.round;render()};',
+      '\nglobalThis.testRefresh=refresh;globalThis.ready=()=>new Promise(r=>setTimeout(r,0));globalThis.testSet=(s)=>{if(s.page)page=s.page;if(s.mode)mode=s.mode;if(s.newsTeam)newsTeam=s.newsTeam;if(s.round)round=s.round;render()};',
     Object.assign(c, { setTimeout })
   );
   return { c, el, document };
@@ -138,4 +138,17 @@ test('postseason settings route shows persistent settings panel and hides season
   c.testSet({ page: 'games' });
   assert.equal(el('settingsPage').hidden, true);
   assert.equal(el('postseasonRoot').hidden, false);
+});
+
+test('stale empty server response preserves previously displayed postseason records', async () => {
+  const { c, el } = harness();
+  await c.ready();
+  assert.match(el('postseasonRoot').innerHTML, /두산/);
+  c.fetch = async () => Response.json({active:true,today:'2026-10-14',year:'2026',games:[],stale:true,fetchedAt:null});
+  await c.testRefresh();
+  assert.match(el('postseasonRoot').innerHTML, /두산/);
+  assert.match(el('postseasonRoot').innerHTML, /최신 일정 연결 지연/);
+  c.fetch = async () => Response.json({active:true,today:'2026-10-14',year:'2026',games:[],stale:false,fetchedAt:new Date().toISOString()});
+  await c.testRefresh();
+  assert.doesNotMatch(el('postseasonRoot').innerHTML, /두산/);
 });
