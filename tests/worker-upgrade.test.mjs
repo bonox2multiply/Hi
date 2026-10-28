@@ -39,3 +39,24 @@ test('client and offline shell asset URLs receive current-version caching', asyn
   assert.equal(response.headers.get('Cache-Control'), 'no-cache', path);
  }
 });
+
+
+test('current shell assets use the installed cache without a network request', async () => {
+ const w = await fresh('shell-fetch');
+ const sw = await (await w.fetch(new Request('https://example.com/sw.js'))).text();
+ const handlers = {};
+ let networkCalls = 0;
+ const context = {
+  URL,
+  self: {location: {origin: 'https://example.com'}, addEventListener: (name, fn) => {handlers[name] = fn;}},
+  caches: {open: async () => ({match: async () => new Response('cached asset'), put: async () => {}})},
+  fetch: async () => {networkCalls++; return new Response('network asset');}
+ };
+ vm.runInNewContext(sw + '\nglobalThis.shell = SHELL;', context);
+ for (const path of context.shell.filter(path => path.includes('?v='))) {
+  let result;
+  handlers.fetch({request: new Request('https://example.com' + path), respondWith: p => {result = p;}, waitUntil() {}});
+  assert.equal(await (await result).text(), 'cached asset', path);
+ }
+ assert.equal(networkCalls, 0);
+});
