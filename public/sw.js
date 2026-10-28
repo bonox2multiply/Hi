@@ -51,7 +51,7 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     (async () => {
       const cache = await caches.open(CACHE);
-      const versioned = u.searchParams.get('v') === '26';
+      const versioned = u.searchParams.get('v') === '28';
       if (versioned) {
         const hit = await cache.match(event.request);
         if (hit) return hit;
